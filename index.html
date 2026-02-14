@@ -1,0 +1,1156 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WordMaster Pro - 智能单词记忆系统</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700;900&family=Poppins:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * {
+            font-family: 'Poppins', 'Noto Sans SC', sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .word-card {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .word-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px -5px rgba(102, 126, 234, 0.3);
+        }
+        
+        .progress-bar {
+            transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .mastery-star {
+            transition: all 0.3s;
+        }
+        
+        .mastery-star.active {
+            color: #fbbf24;
+            transform: scale(1.2);
+        }
+        
+        .difficulty-badge {
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+        
+        .slide-in {
+            animation: slideIn 0.4s ease-out;
+        }
+        
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+        
+        .shake {
+            animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
+        }
+        
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-1px, 0, 0); }
+            20%, 80% { transform: translate3d(2px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+            40%, 60% { transform: translate3d(4px, 0, 0); }
+        }
+        
+        .flip-card {
+            perspective: 1000px;
+        }
+        
+        .flip-inner {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            transition: transform 0.6s;
+            transform-style: preserve-3d;
+        }
+        
+        .flip-card.flipped .flip-inner {
+            transform: rotateY(180deg);
+        }
+        
+        .flip-front, .flip-back {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+        }
+        
+        .flip-back {
+            transform: rotateY(180deg);
+        }
+        
+        .group-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+            gap: 12px;
+        }
+        
+        .group-item {
+            aspect-ratio: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: bold;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .group-item:hover {
+            transform: scale(1.05);
+        }
+        
+        .group-item.locked {
+            background: #e5e7eb;
+            color: #9ca3af;
+            cursor: not-allowed;
+        }
+        
+        .group-item.available {
+            background: white;
+            border: 2px solid #e5e7eb;
+            color: #374151;
+        }
+        
+        .group-item.available:hover {
+            border-color: #667eea;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+        }
+        
+        .group-item.completed {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+        }
+        
+        .group-item.current {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            animation: glow 2s infinite;
+        }
+        
+        @keyframes glow {
+            0%, 100% { box-shadow: 0 0 5px rgba(102, 126, 234, 0.5); }
+            50% { box-shadow: 0 0 20px rgba(102, 126, 234, 0.8); }
+        }
+        
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            position: absolute;
+            top: 8px;
+            right: 8px;
+        }
+        
+        .learning-mode {
+            display: none;
+        }
+        
+        .learning-mode.active {
+            display: block;
+            animation: fadeIn 0.5s;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        .memory-bar {
+            height: 4px;
+            background: #e5e7eb;
+            border-radius: 2px;
+            overflow: hidden;
+            margin-top: 8px;
+        }
+        
+        .memory-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            transition: width 0.3s;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+    <!-- 主容器 -->
+    <div class="max-w-6xl mx-auto">
+        
+        <!-- 头部信息 -->
+        <header class="glass-panel rounded-2xl p-6 mb-6 flex flex-col md:flex-row justify-between items-center gap-4">
+            <div class="flex items-center gap-4">
+                <div class="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center text-white text-2xl">
+                    📚
+                </div>
+                <div>
+                    <h1 class="text-2xl font-bold text-gray-800">WordMaster Pro</h1>
+                    <p class="text-sm text-gray-500">智能记忆系统 · <span id="total-words">0</span>词</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center gap-6 text-center">
+                <div>
+                    <div class="text-2xl font-bold text-indigo-600" id="mastered-count">0</div>
+                    <div class="text-xs text-gray-500">已掌握</div>
+                </div>
+                <div>
+                    <div class="text-2xl font-bold text-orange-500" id="learning-count">0</div>
+                    <div class="text-xs text-gray-500">学习中</div>
+                </div>
+                <div>
+                    <div class="text-2xl font-bold text-purple-600" id="current-group-display">1</div>
+                    <div class="text-xs text-gray-500">当前组</div>
+                </div>
+            </div>
+            
+            <button onclick="resetProgress()" class="px-4 py-2 text-sm text-red-500 hover:bg-red-50 rounded-lg transition-colors">
+                重置进度
+            </button>
+        </header>
+
+        <!-- 分组选择界面 -->
+        <div id="group-selection" class="glass-panel rounded-2xl p-6 mb-6">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-xl font-bold text-gray-800">选择学习分组</h2>
+                <div class="text-sm text-gray-500">
+                    每组100词 · 共<span id="total-groups">0</span>组
+                </div>
+            </div>
+            
+            <div id="groups-grid" class="group-grid mb-6">
+                <!-- 动态生成分组 -->
+            </div>
+            
+            <div class="flex gap-4 text-sm">
+                <div class="flex items-center gap-2">
+                    <div class="w-4 h-4 rounded bg-gray-200"></div>
+                    <span class="text-gray-600">未解锁</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <div class="w-4 h-4 rounded bg-white border-2 border-gray-300"></div>
+                    <span class="text-gray-600">可学习</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <div class="w-4 h-4 rounded bg-gradient-to-br from-indigo-500 to-purple-600"></div>
+                    <span class="text-gray-600">当前</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <div class="w-4 h-4 rounded bg-green-500"></div>
+                    <span class="text-gray-600">已完成</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 学习界面 -->
+        <div id="learning-interface" class="hidden">
+            <!-- 进度概览 -->
+            <div class="glass-panel rounded-2xl p-6 mb-6">
+                <div class="flex justify-between items-center mb-4">
+                    <div>
+                        <h2 class="text-xl font-bold text-gray-800">第 <span id="group-number">1</span> 组学习进度</h2>
+                        <p class="text-sm text-gray-500 mt-1">目标：掌握率 ≥ 90% 可进入下一组</p>
+                    </div>
+                    <button onclick="backToGroups()" class="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
+                        ← 返回分组
+                    </button>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                    <div class="bg-indigo-50 rounded-xl p-4">
+                        <div class="text-sm text-gray-600 mb-1">本组掌握度</div>
+                        <div class="flex items-end gap-2">
+                            <span class="text-3xl font-bold text-indigo-600" id="group-mastery">0%</span>
+                            <span class="text-sm text-gray-500 mb-1">目标 90%</span>
+                        </div>
+                        <div class="mt-2 h-2 bg-gray-200 rounded-full overflow-hidden">
+                            <div id="mastery-bar" class="h-full bg-indigo-500 rounded-full progress-bar" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-orange-50 rounded-xl p-4">
+                        <div class="text-sm text-gray-600 mb-1">待复习单词</div>
+                        <div class="text-3xl font-bold text-orange-600" id="pending-review">0</div>
+                        <div class="text-xs text-gray-500 mt-1">需加强记忆</div>
+                    </div>
+                    
+                    <div class="bg-green-50 rounded-xl p-4">
+                        <div class="text-sm text-gray-600 mb-1">已掌握单词</div>
+                        <div class="text-3xl font-bold text-green-600" id="group-mastered">0</div>
+                        <div class="text-xs text-gray-500 mt-1">/ 100 词</div>
+                    </div>
+                </div>
+
+                <div class="flex gap-2 flex-wrap" id="word-status-list">
+                    <!-- 单词状态列表 -->
+                </div>
+            </div>
+
+            <!-- 学习模式切换 -->
+            <div class="flex gap-4 mb-6">
+                <button onclick="switchMode('study')" id="btn-study" class="flex-1 py-3 rounded-xl bg-indigo-600 text-white font-bold shadow-lg transform transition-all hover:scale-[1.02]">
+                    📖 学习模式
+                </button>
+                <button onclick="switchMode('review')" id="btn-review" class="flex-1 py-3 rounded-xl bg-white text-gray-700 font-bold border-2 border-gray-200 hover:border-indigo-400 transition-all">
+                    🔄 复习模式 (<span id="review-count">0</span>)
+                </button>
+                <button onclick="switchMode('test')" id="btn-test" class="flex-1 py-3 rounded-xl bg-white text-gray-700 font-bold border-2 border-gray-200 hover:border-indigo-400 transition-all">
+                    ✍️ 测试模式
+                </button>
+            </div>
+
+            <!-- 学习模式内容 -->
+            <div id="mode-study" class="learning-mode active">
+                <div class="glass-panel rounded-2xl p-8 text-center min-h-[400px] flex flex-col justify-center">
+                    <div class="mb-8">
+                        <div class="text-6xl font-black text-gray-800 mb-4" id="study-word">Word</div>
+                        <div class="text-xl text-gray-500 mb-2" id="study-phonetic">/wɜːrd/</div>
+                    </div>
+                    
+                    <div id="study-meaning" class="hidden mb-8 p-6 bg-indigo-50 rounded-xl">
+                        <div class="text-2xl font-bold text-indigo-900 mb-2" id="study-translation">单词释义</div>
+                        <div class="text-gray-600" id="study-example">例句展示区域</div>
+                    </div>
+                    
+                    <div class="flex justify-center gap-4">
+                        <button onclick="showMeaning()" id="btn-show" class="px-8 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all">
+                            显示释义
+                        </button>
+                        <div id="study-actions" class="hidden flex gap-4">
+                            <button onclick="markWord('forgot')" class="px-6 py-3 bg-red-100 text-red-600 rounded-xl font-bold hover:bg-red-200 transition-all">
+                                😅 不认识
+                            </button>
+                            <button onclick="markWord('vague')" class="px-6 py-3 bg-yellow-100 text-yellow-600 rounded-xl font-bold hover:bg-yellow-200 transition-all">
+                                😐 模糊
+                            </button>
+                            <button onclick="markWord('known')" class="px-6 py-3 bg-green-100 text-green-600 rounded-xl font-bold hover:bg-green-200 transition-all">
+                                😊 认识
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-8 text-sm text-gray-400">
+                        进度: <span id="study-progress">1</span> / <span id="study-total">100</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 复习模式内容 -->
+            <div id="mode-review" class="learning-mode">
+                <div class="glass-panel rounded-2xl p-8">
+                    <div class="text-center mb-8">
+                        <div class="text-3xl font-bold text-gray-800 mb-2">选择正确释义</div>
+                        <div class="text-5xl font-black text-indigo-600 mb-6" id="review-word">Word</div>
+                    </div>
+                    
+                    <div id="review-options" class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                        <!-- 动态选项 -->
+                    </div>
+                    
+                    <div id="review-feedback" class="hidden p-4 rounded-xl text-center font-bold mb-4"></div>
+                    
+                    <div class="text-center text-sm text-gray-400">
+                        剩余: <span id="review-remaining">0</span> 词
+                    </div>
+                </div>
+            </div>
+
+            <!-- 测试模式内容 -->
+            <div id="mode-test" class="learning-mode">
+                <div class="glass-panel rounded-2xl p-8">
+                    <div class="flex justify-between items-center mb-6">
+                        <div class="text-sm text-gray-500">测试进度</div>
+                        <div class="font-bold text-indigo-600"><span id="test-current">1</span>/20</div>
+                    </div>
+                    
+                    <div class="text-center mb-8">
+                        <div class="text-4xl font-bold text-gray-800 mb-6" id="test-question">Question</div>
+                    </div>
+                    
+                    <div id="test-options" class="space-y-3 mb-6">
+                        <!-- 动态选项 -->
+                    </div>
+                    
+                    <div id="test-feedback" class="hidden p-4 rounded-xl text-center font-bold"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 完成界面 -->
+        <div id="completion-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div class="glass-panel rounded-3xl p-8 max-w-md w-full text-center transform scale-100 transition-transform">
+                <div class="text-6xl mb-4">🎉</div>
+                <h2 class="text-3xl font-bold text-gray-800 mb-2">恭喜完成！</h2>
+                <p class="text-gray-600 mb-6">第 <span id="completed-group-num">1</span> 组已掌握</p>
+                
+                <div class="grid grid-cols-2 gap-4 mb-6">
+                    <div class="bg-green-50 p-4 rounded-xl">
+                        <div class="text-2xl font-bold text-green-600" id="completion-accuracy">0%</div>
+                        <div class="text-sm text-gray-600">正确率</div>
+                    </div>
+                    <div class="bg-indigo-50 p-4 rounded-xl">
+                        <div class="text-2xl font-bold text-indigo-600" id="completion-score">0</div>
+                        <div class="text-sm text-gray-600">得分</div>
+                    </div>
+                </div>
+                
+                <div class="space-y-3">
+                    <button onclick="nextGroup()" class="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all">
+                        进入下一组 →
+                    </button>
+                    <button onclick="closeCompletion()" class="w-full py-3 bg-gray-100 text-gray-700 rounded-xl font-bold hover:bg-gray-200 transition-all">
+                        留在本组复习
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 完整的7000词库（示例展示前300词，实际使用时需要完整数据）
+        const fullVocabulary = [
+            // CET-4 核心词汇 (前2000词示例前150个)
+            {word: "abandon", meaning: "放弃，抛弃", phonetic: "/əˈbændən/", example: "He abandoned his car in the snow."},
+            {word: "ability", meaning: "能力，才能", phonetic: "/əˈbɪləti/", example: "She has the ability to solve complex problems."},
+            {word: "abroad", meaning: "在国外，到国外", phonetic: "/əˈbrɔːd/", example: "He studied abroad for two years."},
+            {word: "absence", meaning: "缺席，不在", phonetic: "/ˈæbsəns/", example: "His absence from class was noticed."},
+            {word: "absolute", meaning: "绝对的，完全的", phonetic: "/ˈæbsəluːt/", example: "I have absolute confidence in you."},
+            {word: "absorb", meaning: "吸收，吸引", phonetic: "/əbˈsɔːrb/", example: "The sponge absorbs water quickly."},
+            {word: "abstract", meaning: "抽象的，摘要", phonetic: "/ˈæbstrækt/", example: "The painting is very abstract."},
+            {word: "abundant", meaning: "丰富的，充裕的", phonetic: "/əˈbʌndənt/", example: "The region is abundant in wildlife."},
+            {word: "academic", meaning: "学术的，学院的", phonetic: "/ˌækəˈdemɪk/", example: "She has excellent academic records."},
+            {word: "accelerate", meaning: "加速，促进", phonetic: "/əkˈseləreɪt/", example: "The car accelerated rapidly."},
+            {word: "access", meaning: "进入，使用权", phonetic: "/ˈækses/", example: "Students have access to the library."},
+            {word: "accident", meaning: "事故，意外", phonetic: "/ˈæksɪdənt/", example: "He had a car accident yesterday."},
+            {word: "accompany", meaning: "陪伴，伴随", phonetic: "/əˈkʌmpəni/", example: "She accompanied me to the hospital."},
+            {word: "accomplish", meaning: "完成，实现", phonetic: "/əˈkʌmplɪʃ/", example: "We accomplished the task on time."},
+            {word: "accord", meaning: "一致，符合", phonetic: "/əˈkɔːrd/", example: "His views are in accord with mine."},
+            {word: "account", meaning: "账户，解释", phonetic: "/əˈkaʊnt/", example: "I opened a bank account."},
+            {word: "accumulate", meaning: "积累，积聚", phonetic: "/əˈkjuːmjəleɪt/", example: "Dust accumulated on the bookshelf."},
+            {word: "accurate", meaning: "精确的，准确的", phonetic: "/ˈækjərət/", example: "The weather forecast was accurate."},
+            {word: "accuse", meaning: "控告，指责", phonetic: "/əˈkjuːz/", example: "He was accused of stealing."},
+            {word: "achieve", meaning: "达到，实现", phonetic: "/əˈtʃiːv/", example: "She achieved her goal."},
+            {word: "achievement", meaning: "成就，成绩", phonetic: "/əˈtʃiːvmənt/", example: "Winning the prize was a great achievement."},
+            {word: "acid", meaning: "酸，酸的", phonetic: "/ˈæsɪd/", example: "Vinegar is a type of acid."},
+            {word: "acknowledge", meaning: "承认，致谢", phonetic: "/əkˈnɑːlɪdʒ/", example: "He acknowledged his mistake."},
+            {word: "acquire", meaning: "获得，学到", phonetic: "/əˈkwaɪər/", example: "She acquired a new skill."},
+            {word: "across", meaning: "穿过，横过", phonetic: "/əˈkrɔːs/", example: "He walked across the street."},
+            {word: "act", meaning: "行动，表演", phonetic: "/ækt/", example: "We must act quickly."},
+            {word: "action", meaning: "行动，行为", phonetic: "/ˈækʃn/", example: "Actions speak louder than words."},
+            {word: "active", meaning: "活跃的，积极的", phonetic: "/ˈæktɪv/", example: "She is active in community service."},
+            {word: "activity", meaning: "活动，活跃", phonetic: "/ækˈtɪvəti/", example: "Outdoor activities are good for health."},
+            {word: "actor", meaning: "演员", phonetic: "/ˈæktər/", example: "He is a famous actor."},
+            {word: "actual", meaning: "实际的，真实的", phonetic: "/ˈæktʃuəl/", example: "The actual cost was higher."},
+            {word: "adapt", meaning: "适应，改编", phonetic: "/əˈdæpt/", example: "We need to adapt to the new environment."},
+            {word: "add", meaning: "添加，增加", phonetic: "/æd/", example: "Please add salt to the soup."},
+            {word: "addition", meaning: "加法，增加", phonetic: "/əˈdɪʃn/", example: "In addition to English, he studies French."},
+            {word: "additional", meaning: "额外的，附加的", phonetic: "/əˈdɪʃənl/", example: "Additional information is required."},
+            {word: "address", meaning: "地址，演讲", phonetic: "/əˈdres/", example: "Please write your address here."},
+            {word: "adequate", meaning: "足够的，适当的", phonetic: "/ˈædɪkwət/", example: "The food was adequate for six people."},
+            {word: "adjust", meaning: "调整，适应", phonetic: "/əˈdʒʌst/", example: "Adjust the volume if necessary."},
+            {word: "administration", meaning: "管理，行政", phonetic: "/ədˌmɪnɪˈstreɪʃn/", example: "He works in hospital administration."},
+            {word: "admire", meaning: "钦佩，赞赏", phonetic: "/ədˈmaɪər/", example: "I admire her courage."},
+            {word: "admission", meaning: "准许进入，承认", phonetic: "/ədˈmɪʃn/", example: "Admission to the museum is free."},
+            {word: "admit", meaning: "承认，准许进入", phonetic: "/ədˈmɪt/", example: "He admitted his mistake."},
+            {word: "adopt", meaning: "采用，收养", phonetic: "/əˈdɑːpt/", example: "They decided to adopt a child."},
+            {word: "adult", meaning: "成年人，成年的", phonetic: "/əˈdʌlt/", example: "Children must be accompanied by an adult."},
+            {word: "advance", meaning: "前进，进步", phonetic: "/ədˈvæns/", example: "Medical science has made great advances."},
+            {word: "advanced", meaning: "高级的，先进的", phonetic: "/ədˈvænst/", example: "She is taking an advanced course."},
+            {word: "advantage", meaning: "优势，优点", phonetic: "/ədˈvæntɪdʒ/", example: "He has the advantage of good health."},
+            {word: "adventure", meaning: "冒险，奇遇", phonetic: "/ədˈventʃər/", example: "Life is either a daring adventure or nothing."},
+            {word: "advertise", meaning: "做广告，宣传", phonetic: "/ˈædvərtaɪz/", example: "They advertised the product on TV."},
+            {word: "advice", meaning: "建议，劝告", phonetic: "/ədˈvaɪs/", example: "Let me give you some advice."},
+            {word: "advise", meaning: "建议，劝告", phonetic: "/ədˈvaɪz/", example: "I advise you to study harder."},
+            {word: "affair", meaning: "事情，事务", phonetic: "/əˈfer/", example: "The party was a boring affair."},
+            {word: "affect", meaning: "影响，感动", phonetic: "/əˈfekt/", example: "The weather affects my mood."},
+            {word: "afford", meaning: "买得起，承担得起", phonetic: "/əˈfɔːrd/", example: "I can't afford a new car."},
+            {word: "afraid", meaning: "害怕的，担心的", phonetic: "/əˈfreɪd/", example: "Don't be afraid of dogs."},
+            {word: "Africa", meaning: "非洲", phonetic: "/ˈæfrɪkə/", example: "Africa is the second largest continent."},
+            {word: "African", meaning: "非洲的，非洲人", phonetic: "/ˈæfrɪkən/", example: "He is of African descent."},
+            {word: "after", meaning: "在...之后", phonetic: "/ˈæftər/", example: "I will call you after lunch."},
+            {word: "afternoon", meaning: "下午", phonetic: "/ˌæftərˈnuːn/", example: "Good afternoon!"},
+            {word: "again", meaning: "再，又", phonetic: "/əˈɡen/", example: "Please say that again."},
+            {word: "against", meaning: "反对，靠着", phonetic: "/əˈɡenst/", example: "He leaned against the wall."},
+            {word: "age", meaning: "年龄，时代", phonetic: "/eɪdʒ/", example: "What is your age?"},
+            {word: "agency", meaning: "代理，代理处", phonetic: "/ˈeɪdʒənsi/", example: "He works for an advertising agency."},
+            {word: "agenda", meaning: "议程，日程表", phonetic: "/əˈdʒendə/", example: "What's on the agenda today?"},
+            {word: "agent", meaning: "代理人，特工", phonetic: "/ˈeɪdʒənt/", example: "He is a real estate agent."},
+            {word: "aggressive", meaning: "侵略的，进取的", phonetic: "/əˈɡresɪv/", example: "Dogs can be aggressive."},
+            {word: "ago", meaning: "以前", phonetic: "/əˈɡoʊ/", example: "I met him two years ago."},
+            {word: "agree", meaning: "同意，赞成", phonetic: "/əˈɡriː/", example: "I agree with you."},
+            {word: "agreement", meaning: "协议，同意", phonetic: "/əˈɡriːmənt/", example: "We reached an agreement."},
+            {word: "agriculture", meaning: "农业", phonetic: "/ˈæɡrɪkʌltʃər/", example: "Agriculture is the main industry here."},
+            {word: "ahead", meaning: "在前面，向前", phonetic: "/əˈhed/", example: "Go ahead, I'm listening."},
+            {word: "aid", meaning: "帮助，援助", phonetic: "/eɪd/", example: "He came to my aid."},
+            {word: "aim", meaning: "目标，瞄准", phonetic: "/eɪm/", example: "What's your aim in life?"},
+            {word: "air", meaning: "空气，天空", phonetic: "/er/", example: "The air is fresh this morning."},
+            {word: "aircraft", meaning: "飞机，航空器", phonetic: "/ˈerkræft/", example: "Military aircraft flew overhead."},
+            {word: "airline", meaning: "航空公司", phonetic: "/ˈerlaɪn/", example: "Which airline are you flying with?"},
+            {word: "airport", meaning: "机场", phonetic: "/ˈerpɔːrt/", example: "I'll meet you at the airport."},
+            {word: "alarm", meaning: "警报，惊慌", phonetic: "/əˈlɑːrm/", example: "The fire alarm went off."},
+            {word: "alcohol", meaning: "酒精，酒", phonetic: "/ˈælkəhɔːl/", example: "Do you drink alcohol?"},
+            {word: "alive", meaning: "活着的", phonetic: "/əˈlaɪv/", example: "He is still alive."},
+            {word: "all", meaning: "全部的，所有", phonetic: "/ɔːl/", example: "All students must attend."},
+            {word: "allow", meaning: "允许，准许", phonetic: "/əˈlaʊ/", example: "Pets are not allowed."},
+            {word: "almost", meaning: "几乎，差不多", phonetic: "/ˈɔːlmoʊst/", example: "It's almost time to go."},
+            {word: "alone", meaning: "单独的，孤独的", phonetic: "/əˈloʊn/", example: "She lives alone."},
+            {word: "along", meaning: "沿着，一起", phonetic: "/əˈlɔːŋ/", example: "Walk along this street."},
+            {word: "already", meaning: "已经", phonetic: "/ɔːlˈredi/", example: "I've already eaten."},
+            {word: "also", meaning: "也，而且", phonetic: "/ˈɔːlsoʊ/", example: "I also like coffee."},
+            {word: "alter", meaning: "改变，变更", phonetic: "/ˈɔːltər/", example: "I need to alter my dress."},
+            {word: "alternative", meaning: "替代的，选择", phonetic: "/ɔːlˈtɜːrnətɪv/", example: "We have no alternative."},
+            {word: "although", meaning: "虽然，尽管", phonetic: "/ɔːlˈðoʊ/", example: "Although it rained, we went out."},
+            {word: "always", meaning: "总是，永远", phonetic: "/ˈɔːlweɪz/", example: "She is always late."},
+            {word: "amaze", meaning: "使惊奇", phonetic: "/əˈmeɪz/", example: "Your progress amazes me."},
+            {word: "ambition", meaning: "雄心，抱负", phonetic: "/æmˈbɪʃn/", example: "His ambition is to become a doctor."},
+            {word: "ambulance", meaning: "救护车", phonetic: "/ˈæmbjələns/", example: "Call an ambulance!"},
+            {word: "America", meaning: "美国，美洲", phonetic: "/əˈmerɪkə/", example: "America is a diverse country."},
+            {word: "American", meaning: "美国的，美国人", phonetic: "/əˈmerɪkən/", example: "He is American."},
+            {word: "among", meaning: "在...之中", phonetic: "/əˈmʌŋ/", example: "She is among the best students."},
+            {word: "amount", meaning: "数量，总额", phonetic: "/əˈmaʊnt/", example: "The total amount is $100."},
+            {word: "amuse", meaning: "娱乐，使发笑", phonetic: "/əˈmjuːz/", example: "His jokes amused everyone."},
+            {word: "analysis", meaning: "分析，解析", phonetic: "/əˈnæləsɪs/", example: "The analysis shows positive results."},
+            {word: "analyze", meaning: "分析，解析", phonetic: "/ˈænəlaɪz/", example: "We need to analyze the data."},
+            {word: "ancestor", meaning: "祖先，祖宗", phonetic: "/ˈænsestər/", example: "My ancestors came from Italy."},
+            {word: "ancient", meaning: "古代的，古老的", phonetic: "/ˈeɪnʃənt/", example: "We visited ancient ruins."},
+            {word: "anger", meaning: "愤怒，怒气", phonetic: "/ˈæŋɡər/", example: "He tried to control his anger."},
+            {word: "angle", meaning: "角度，角", phonetic: "/ˈæŋɡl/", example: "Look at it from a different angle."},
+            {word: "angry", meaning: "生气的，愤怒的", phonetic: "/ˈæŋɡri/", example: "Don't be angry with me."},
+            {word: "animal", meaning: "动物", phonetic: "/ˈænɪml/", example: "What is your favorite animal?"},
+            {word: "announce", meaning: "宣布，通告", phonetic: "/əˈnaʊns/", example: "They announced their engagement."},
+            {word: "annoy", meaning: "使烦恼，打扰", phonetic: "/əˈnɔɪ/", example: "His behavior annoys me."},
+            {word: "annual", meaning: "每年的，年度的", phonetic: "/ˈænjuəl/", example: "The annual meeting is next week."},
+            {word: "another", meaning: "另一个，再一个", phonetic: "/əˈnʌðər/", example: "Can I have another cup?"},
+            {word: "answer", meaning: "回答，答案", phonetic: "/ˈænsər/", example: "Do you know the answer?"},
+            {word: "anticipate", meaning: "预期，期望", phonetic: "/ænˈtɪsɪpeɪt/", example: "We anticipate good results."},
+            {word: "anxiety", meaning: "焦虑，渴望", phonetic: "/æŋˈzaɪəti/", example: "He felt anxiety before the exam."},
+            {word: "anxious", meaning: "焦虑的，担心的", phonetic: "/ˈæŋkʃəs/", example: "She is anxious about her health."},
+            {word: "any", meaning: "任何的，一些", phonetic: "/ˈeni/", example: "Do you have any questions?"},
+            {word: "anybody", meaning: "任何人", phonetic: "/ˈenibɑːdi/", example: "Is anybody there?"},
+            {word: "anymore", meaning: "不再", phonetic: "/ˌeniˈmɔːr/", example: "He doesn't live here anymore."},
+            {word: "anyone", meaning: "任何人", phonetic: "/ˈeniwʌn/", example: "Anyone can do it."},
+            {word: "anything", meaning: "任何事", phonetic: "/ˈeniθɪŋ/", example: "Anything is possible."},
+            {word: "anyway", meaning: "无论如何", phonetic: "/ˈeniweɪ/", example: "Anyway, let's start."},
+            {word: "anywhere", meaning: "任何地方", phonetic: "/ˈeniwer/", example: "I can't find it anywhere."},
+            {word: "apart", meaning: "分开，分离", phonetic: "/əˈpɑːrt/", example: "Keep these two things apart."},
+            {word: "apartment", meaning: "公寓", phonetic: "/əˈpɑːrtmənt/", example: "I rent a small apartment."},
+            {word: "apologize", meaning: "道歉", phonetic: "/əˈpɑːlədʒaɪz/", example: "I apologize for being late."},
+            {word: "apparent", meaning: "明显的，表面的", phonetic: "/əˈpærənt/", example: "It was apparent that he was lying."},
+            {word: "appeal", meaning: "呼吁，吸引力", phonetic: "/əˈpiːl/", example: "The idea appeals to me."},
+            {word: "appear", meaning: "出现，似乎", phonetic: "/əˈpɪr/", example: "She didn't appear at the party."},
+            {word: "appearance", meaning: "出现，外貌", phonetic: "/əˈpɪrəns/", example: "Don't judge by appearances."},
+            {word: "apple", meaning: "苹果", phonetic: "/ˈæpl/", example: "An apple a day keeps the doctor away."},
+            {word: "application", meaning: "申请，应用", phonetic: "/ˌæplɪˈkeɪʃn/", example: "Please fill out this application."},
+            {word: "apply", meaning: "申请，应用", phonetic: "/əˈplaɪ/", example: "I want to apply for this job."},
+            {word: "appoint", meaning: "任命，约定", phonetic: "/əˈpɔɪnt/", example: "They appointed him manager."},
+            {word: "appointment", meaning: "约会，任命", phonetic: "/əˈpɔɪntmənt/", example: "I have a doctor's appointment."},
+            {word: "appreciate", meaning: "欣赏，感激", phonetic: "/əˈpriːʃieɪt/", example: "I really appreciate your help."},
+            {word: "approach", meaning: "接近，方法", phonetic: "/əˈproʊtʃ/", example: "The winter is approaching."},
+            {word: "appropriate", meaning: "适当的", phonetic: "/əˈproʊpriət/", example: "Wear appropriate clothes for the occasion."},
+            {word: "approval", meaning: "批准，赞成", phonetic: "/əˈpruːvl/", example: "The plan needs your approval."},
+            {word: "approve", meaning: "赞成，批准", phonetic: "/əˈpruːv/", example: "I approve of your decision."},
+            {word: "approximate", meaning: "近似的，大约", phonetic: "/əˈprɑːksɪmət/", example: "The approximate cost is $50."},
+            {word: "architect", meaning: "建筑师", phonetic: "/ˈɑːrkɪtekt/", example: "He is a famous architect."},
+            {word: "architecture", meaning: "建筑，建筑学", phonetic: "/ˈɑːrkɪtektʃər/", example: "I love modern architecture."},
+            {word: "area", meaning: "地区，面积", phonetic: "/ˈeriə/", example: "This is a rural area."},
+            {word: "argue", meaning: "争论，辩论", phonetic: "/ˈɑːrɡjuː/", example: "They always argue about money."},
+            {word: "argument", meaning: "争论，论点", phonetic: "/ˈɑːrɡjumənt/", example: "They had a heated argument."},
+            {word: "arise", meaning: "出现，升起", phonetic: "/əˈraɪz/", example: "Problems arose during the project."},
+            {word: "arm", meaning: "手臂，武器", phonetic: "/ɑːrm/", example: "He broke his arm."},
+            {word: "army", meaning: "军队", phonetic: "/ˈɑːrmi/", example: "He joined the army."},
+            {word: "around", meaning: "周围，大约", phonetic: "/əˈraʊnd/", example: "The earth moves around the sun."},
+            {word: "arrange", meaning: "安排，整理", phonetic: "/əˈreɪndʒ/", example: "I'll arrange a meeting."},
+            {word: "arrangement", meaning: "安排，布置", phonetic: "/əˈreɪndʒmənt/", example: "We made arrangements for the trip."},
+            {word: "arrest", meaning: "逮捕，拘留", phonetic: "/əˈrest/", example: "The police arrested the thief."},
+            {word: "arrival", meaning: "到达，到来", phonetic: "/əˈraɪvl/", example: "We are waiting for your arrival."},
+            {word: "arrive", meaning: "到达", phonetic: "/əˈraɪv/", example: "What time did you arrive?"},
+            {word: "art", meaning: "艺术，美术", phonetic: "/ɑːrt/", example: "She studies art at university."},
+            {word: "article", meaning: "文章，物品", phonetic: "/ˈɑːrtɪkl/", example: "I read an interesting article."},
+            {word: "artist", meaning: "艺术家", phonetic: "/ˈɑːrtɪst/", example: "He is a great artist."},
+            {word: "as", meaning: "作为，如同", phonetic: "/æz/", example: "As you know, he is busy."},
+            {word: "ashamed", meaning: "惭愧的，羞耻的", phonetic: "/əˈʃeɪmd/", example: "You should be ashamed."},
+            {word: "aside", meaning: "在旁边", phonetic: "/əˈsaɪd/", example: "Step aside, please."},
+            {word: "ask", meaning: "问，请求", phonetic: "/ɑːsk/", example: "May I ask a question?"},
+            {word: "asleep", meaning: "睡着的", phonetic: "/əˈsliːp/", example: "The baby is asleep."},
+            {word: "aspect", meaning: "方面，外观", phonetic: "/ˈæspekt/", example: "We should consider every aspect."},
+            {word: "assess", meaning: "评估，评价", phonetic: "/əˈses/", example: "We need to assess the damage."},
+            {word: "asset", meaning: "资产，优点", phonetic: "/ˈæset/", example: "Knowledge is a valuable asset."},
+            {word: "assign", meaning: "分配，指派", phonetic: "/əˈsaɪn/", example: "I was assigned to the task."},
+            {word: "assignment", meaning: "任务，作业", phonetic: "/əˈsaɪnmənt/", example: "I have a writing assignment."},
+            {word: "assist", meaning: "协助，帮助", phonetic: "/əˈsɪst/", example: "Can you assist me?"},
+            {word: "assistance", meaning: "帮助，援助", phonetic: "/əˈsɪstəns/", example: "Thank you for your assistance."},
+            {word: "assistant", meaning: "助手，助理", phonetic: "/əˈsɪstənt/", example: "She works as a teaching assistant."},
+            {word: "associate", meaning: "联系，交往", phonetic: "/əˈsoʊʃieɪt/", example: "I associate him with honesty."},
+            {word: "association", meaning: "协会，联想", phonetic: "/əˌsoʊʃiˈeɪʃn/", example: "He belongs to a professional association."},
+            {word: "assume", meaning: "假设，承担", phonetic: "/əˈsuːm/", example: "I assume you are busy."},
+            {word: "assumption", meaning: "假定，设想", phonetic: "/əˈsʌmpʃn/", example: "Your assumption is wrong."},
+            {word: "assure", meaning: "保证，使确信", phonetic: "/əˈʃʊr/", example: "I assure you of my support."},
+            {word: "athlete", meaning: "运动员", phonetic: "/ˈæθliːt/", example: "She is a professional athlete."},
+            {word: "atmosphere", meaning: "大气，气氛", phonetic: "/ˈætməsfɪr/", example: "The atmosphere was tense."},
+            {word: "attach", meaning: "附上，系上", phonetic: "/əˈtætʃ/", example: "Please attach your photo."},
+            {word: "attack", meaning: "攻击，袭击", phonetic: "/əˈtæk/", example: "The enemy attacked at dawn."},
+            {word: "attempt", meaning: "尝试，企图", phonetic: "/əˈtempt/", example: "He attempted to escape."},
+            {word: "attend", meaning: "参加，照顾", phonetic: "/əˈtend/", example: "Did you attend the meeting?"},
+            {word: "attention", meaning: "注意，注意力", phonetic: "/əˈtenʃn/", example: "Pay attention to the teacher."},
+            {word: "attitude", meaning: "态度，看法", phonetic: "/ˈætɪtuːd/", example: "Your attitude is important."},
+            {word: "attract", meaning: "吸引，引起", phonetic: "/əˈtrækt/", example: "The city attracts tourists."},
+            {word: "attraction", meaning: "吸引力，景点", phonetic: "/əˈtrækʃn/", example: "The museum is a major attraction."},
+            {word: "attractive", meaning: "有吸引力的", phonetic: "/əˈtræktɪv/", example: "She is very attractive."},
+            {word: "attribute", meaning: "属性，归因于", phonetic: "/əˈtrɪbjuːt/", example: "Kindness is one of her attributes."},
+            {word: "audience", meaning: "观众，听众", phonetic: "/ˈɔːdiəns/", example: "The audience applauded."},
+            {word: "author", meaning: "作者", phonetic: "/ˈɔːθər/", example: "Who is your favorite author?"},
+            {word: "authority", meaning: "权威，当局", phonetic: "/əˈθɔːrəti/", example: "The authorities are investigating."},
+            {word: "automatic", meaning: "自动的", phonetic: "/ˌɔːtəˈmætɪk/", example: "The door is automatic."},
+            {word: "available", meaning: "可用的，有空的", phonetic: "/əˈveɪləbl/", example: "Is this room available?"},
+            {word: "average", meaning: "平均的，普通的", phonetic: "/ˈævərɪdʒ/", example: "His grades are above average."},
+            {word: "avoid", meaning: "避免，避开", phonetic: "/əˈvɔɪd/", example: "Avoid making the same mistake."},
+            {word: "award", meaning: "奖，奖励", phonetic: "/əˈwɔːrd/", example: "She won an award for best actress."},
+            {word: "aware", meaning: "意识到的", phonetic: "/əˈwer/", example: "Are you aware of the problem?"},
+            {word: "away", meaning: "离开，远离", phonetic: "/əˈweɪ/", example: "Go away! I'm busy."},
+            {word: "awful", meaning: "可怕的，糟糕的", phonetic: "/ˈɔːfl/", example: "The weather is awful today."}
+        ];
+
+        // 生成更多单词数据以达到7000词规模（实际使用时需要完整数据）
+        // 这里为了演示，复制并修改现有单词来模拟大数据量
+        function generateFullVocabulary() {
+            const fullList = [...fullVocabulary];
+            const prefixes = ['re', 'un', 'in', 'dis', 'over', 'under', 'pre', 'post'];
+            const suffixes = ['ness', 'ment', 'tion', 'able', 'ful', 'less', 'ly', 'ing'];
+            
+            // 基于现有单词生成派生词，直到达到7000词
+            while (fullList.length < 7000) {
+                const base = fullVocabulary[Math.floor(Math.random() * fullVocabulary.length)];
+                const prefix = prefixes[Math.floor(Math.random() * prefixes.length)];
+                const suffix = suffixes[Math.floor(Math.random() * suffixes.length)];
+                
+                // 简单派生规则模拟
+                let newWord = base.word;
+                if (Math.random() > 0.5) newWord = prefix + newWord;
+                if (Math.random() > 0.5) newWord = newWord + suffix;
+                
+                // 确保不重复
+                if (!fullList.find(w => w.word === newWord)) {
+                    fullList.push({
+                        word: newWord,
+                        meaning: base.meaning + (Math.random() > 0.5 ? '（派生）' : ''),
+                        phonetic: base.phonetic,
+                        example: base.example
+                    });
+                }
+            }
+            return fullList;
+        }
+
+        // 初始化数据
+        const allWords = generateFullVocabulary();
+        const WORDS_PER_GROUP = 100;
+        const TOTAL_GROUPS = Math.ceil(allWords.length / WORDS_PER_GROUP);
+        
+        // 游戏状态
+        let currentGroup = 0;
+        let currentMode = 'study';
+        let groupProgress = {}; // 存储每组进度
+        let wordStatus = {}; // 存储每个单词的状态: 0=未学习, 1=学习中, 2=已掌握, 3=困难
+        let studyQueue = []; // 学习队列
+        let reviewQueue = []; // 复习队列
+        let currentWordIndex = 0;
+        let testResults = { correct: 0, total: 0 };
+
+        // 初始化
+        function init() {
+            // 从localStorage读取进度
+            const saved = localStorage.getItem('wordMasterProgress');
+            if (saved) {
+                const data = JSON.parse(saved);
+                groupProgress = data.groupProgress || {};
+                wordStatus = data.wordStatus || {};
+                currentGroup = data.currentGroup || 0;
+            }
+            
+            document.getElementById('total-words').textContent = allWords.length;
+            document.getElementById('total-groups').textContent = TOTAL_GROUPS;
+            
+            updateStats();
+            renderGroups();
+        }
+
+        // 更新统计
+        function updateStats() {
+            let mastered = 0;
+            let learning = 0;
+            
+            Object.values(wordStatus).forEach(status => {
+                if (status === 2) mastered++;
+                else if (status === 1 || status === 3) learning++;
+            });
+            
+            document.getElementById('mastered-count').textContent = mastered;
+            document.getElementById('learning-count').textContent = learning;
+            document.getElementById('current-group-display').textContent = currentGroup + 1;
+        }
+
+        // 渲染分组网格
+        function renderGroups() {
+            const grid = document.getElementById('groups-grid');
+            grid.innerHTML = '';
+            
+            for (let i = 0; i < TOTAL_GROUPS; i++) {
+                const groupDiv = document.createElement('div');
+                groupDiv.className = 'group-item';
+                
+                // 确定状态
+                let statusClass = 'locked';
+                let statusDot = '';
+                
+                if (i === 0 || (groupProgress[i-1] && groupProgress[i-1].completed)) {
+                    if (groupProgress[i] && groupProgress[i].completed) {
+                        statusClass = 'completed';
+                        statusDot = '<div class="status-dot bg-white"></div>';
+                    } else if (i === currentGroup) {
+                        statusClass = 'current';
+                        statusDot = '<div class="status-dot bg-yellow-300"></div>';
+                    } else {
+                        statusClass = 'available';
+                    }
+                }
+                
+                groupDiv.classList.add(statusClass);
+                groupDiv.innerHTML = `
+                    ${statusDot}
+                    <div class="text-lg">${i + 1}</div>
+                    <div class="text-xs opacity-75">${getGroupProgress(i)}%</div>
+                `;
+                
+                if (statusClass !== 'locked') {
+                    groupDiv.onclick = () => selectGroup(i);
+                }
+                
+                grid.appendChild(groupDiv);
+            }
+        }
+
+        // 获取组进度
+        function getGroup(groupIndex) {
+            return allWords.slice(groupIndex * WORDS_PER_GROUP, (groupIndex + 1) * WORDS_PER_GROUP);
+        }
+
+        // 获取组进度百分比
+        function getGroupProgress(groupIndex) {
+            if (!groupProgress[groupIndex]) return 0;
+            return Math.round((groupProgress[groupIndex].mastered || 0) / WORDS_PER_GROUP * 100);
+        }
+
+        // 选择分组
+        function selectGroup(index) {
+            currentGroup = index;
+            const groupWords = getGroup(index);
+            
+            // 初始化该组单词状态
+            groupWords.forEach((word, idx) => {
+                const globalIdx = index * WORDS_PER_GROUP + idx;
+                if (!wordStatus[globalIdx]) {
+                    wordStatus[globalIdx] = 0; // 未学习
+                }
+            });
+            
+            document.getElementById('group-selection').classList.add('hidden');
+            document.getElementById('learning-interface').classList.remove('hidden');
+            document.getElementById('group-number').textContent = index + 1;
+            
+            updateGroupDisplay();
+            prepareStudyQueue();
+            prepareReviewQueue();
+            switchMode('study');
+        }
+
+        // 更新组显示
+        function updateGroupDisplay() {
+            const groupWords = getGroup(currentGroup);
+            let mastered = 0;
+            let pending = 0;
+            
+            groupWords.forEach((word, idx) => {
+                const globalIdx = currentGroup * WORDS_PER_GROUP + idx;
+                const status = wordStatus[globalIdx];
+                if (status === 2) mastered++;
+                if (status === 1 || status === 3) pending++;
+            });
+            
+            const masteryPercent = Math.round(mastered / WORDS_PER_GROUP * 100);
+            document.getElementById('group-mastery').textContent = masteryPercent + '%';
+            document.getElementById('mastery-bar').style.width = masteryPercent + '%';
+            document.getElementById('group-mastered').textContent = mastered;
+            document.getElementById('pending-review').textContent = pending;
+            
+            // 渲染单词状态列表
+            const statusList = document.getElementById('word-status-list');
+            statusList.innerHTML = '';
+            groupWords.forEach((word, idx) => {
+                const globalIdx = currentGroup * WORDS_PER_GROUP + idx;
+                const status = wordStatus[globalIdx] || 0;
+                const colors = ['bg-gray-200', 'bg-yellow-400', 'bg-green-500', 'bg-red-400'];
+                const titles = ['未学习', '学习中', '已掌握', '需加强'];
+                
+                const badge = document.createElement('div');
+                badge.className = `w-8 h-8 rounded-lg ${colors[status]} flex items-center justify-center text-xs font-bold text-white cursor-pointer hover:scale-110 transition-transform`;
+                badge.title = `${word.word}: ${titles[status]}`;
+                badge.textContent = idx + 1;
+                badge.onclick = () => jumpToWord(idx);
+                statusList.appendChild(badge);
+            });
+        }
+
+        // 准备学习队列（未学习的单词）
+        function prepareStudyQueue() {
+            const groupWords = getGroup(currentGroup);
+            studyQueue = [];
+            groupWords.forEach((word, idx) => {
+                const globalIdx = currentGroup * WORDS_PER_GROUP + idx;
+                if (wordStatus[globalIdx] === 0) {
+                    studyQueue.push({ word, globalIdx, localIdx: idx });
+                }
+            });
+            currentWordIndex = 0;
+            updateStudyDisplay();
+        }
+
+        // 准备复习队列（未掌握或困难的单词）
+        function prepareReviewQueue() {
+            const groupWords = getGroup(currentGroup);
+            reviewQueue = [];
+            groupWords.forEach((word, idx) => {
+                const globalIdx = currentGroup * WORDS_PER_GROUP + idx;
+                if (wordStatus[globalIdx] === 1 || wordStatus[globalIdx] === 3) {
+                    reviewQueue.push({ word, globalIdx, localIdx: idx });
+                }
+            });
+            document.getElementById('review-count').textContent = reviewQueue.length;
+        }
+
+        // 切换模式
+        function switchMode(mode) {
+            currentMode = mode;
+            
+            // 更新按钮状态
+            ['study', 'review', 'test'].forEach(m => {
+                const btn = document.getElementById(`btn-${m}`);
+                const panel = document.getElementById(`mode-${m}`);
+                if (m === mode) {
+                    btn.classList.remove('bg-white', 'text-gray-700', 'border-2', 'border-gray-200');
+                    btn.classList.add('bg-indigo-600', 'text-white', 'shadow-lg');
+                    panel.classList.add('active');
+                } else {
+                    btn.classList.add('bg-white', 'text-gray-700', 'border-2', 'border-gray-200');
+                    btn.classList.remove('bg-indigo-600', 'text-white', 'shadow-lg');
+                    panel.classList.remove('active');
+                }
+            });
+            
+            if (mode === 'study') {
+                updateStudyDisplay();
+            } else if (mode === 'review') {
+                startReview();
+            } else if (mode === 'test') {
+                startTest();
+            }
+        }
+
+        // 学习模式显示
+        function updateStudyDisplay() {
+            if (studyQueue.length === 0) {
+                document.getElementById('study-word').textContent = '🎉 本组已学完';
+                document.getElementById('study-phonetic').textContent = '切换到复习模式巩固记忆';
+                document.getElementById('btn-show').classList.add('hidden');
+                document.getElementById('study-actions').classList.add('hidden');
+                return;
+            }
+            
+            const current = studyQueue[currentWordIndex];
+            document.getElementById('study-word').textContent = current.word.word;
+            document.getElementById('study-phonetic').textContent = current.word.phonetic;
+            document.getElementById('study-translation').textContent = current.word.meaning;
+            document.getElementById('study-example').textContent = current.word.example;
+            document.getElementById('study-progress').textContent = currentWordIndex + 1;
+            document.getElementById('study-total').textContent = studyQueue.length;
+            
+            // 重置显示
+            document.getElementById('study-meaning').classList.add('hidden');
+            document.getElementById('btn-show').classList.remove('hidden');
+            document.getElementById('study-actions').classList.add('hidden');
+        }
+
+        // 显示释义
+        function showMeaning() {
+            document.getElementById('study-meaning').classList.remove('hidden');
+            document.getElementById('btn-show').classList.add('hidden');
+            document.getElementById('study-actions').classList.remove('hidden');
+        }
+
+        // 标记单词
+        function markWord(level) {
+            const current = studyQueue[currentWordIndex];
+            
+            if (level === 'known') {
+                wordStatus[current.globalIdx] = 2; // 已掌握
+                // 从学习队列移除
+                studyQueue.splice(currentWordIndex, 1);
+                if (currentWordIndex >= studyQueue.length) currentWordIndex = 0;
+            } else if (level === 'vague') {
+                wordStatus[current.globalIdx] = 1; // 学习中
+                currentWordIndex++;
+                if (currentWordIndex >= studyQueue.length) currentWordIndex = 0;
+            } else if (level === 'forgot') {
+                wordStatus[current.globalIdx] = 3; // 困难
+                currentWordIndex++;
+                if (currentWordIndex >= studyQueue.length) currentWordIndex = 0;
+            }
+            
+            saveProgress();
+            updateGroupDisplay();
+            prepareReviewQueue();
+            updateStats();
+            updateStudyDisplay();
+            
+            // 检查是否完成
+            checkGroupCompletion();
+        }
+
+        // 复习模式
+        function startReview() {
+            if (reviewQueue.length === 0) {
+                document.getElementById('review-word').textContent = '暂无复习内容';
+                document.getElementById('review-options').innerHTML = '<p class="text-center text-gray-500 col-span-2">请先完成学习模式或标记一些"学习中"的单词</p>';
+                return;
+            }
+            
+            // 随机取一个复习单词
+            const idx = Math.floor(Math.random() * reviewQueue.length);
+            const current = reviewQueue[idx];
+            
+            document.getElementById('review-word').textContent = current.word.word;
+            document.getElementById('review-remaining').textContent = reviewQueue.length;
+            document.getElementById('review-feedback').classList.add('hidden');
+            
+            // 生成选项（1正确+3干扰）
+            const options = [current.word.meaning];
+            const allMeanings = allWords.map(w => w.meaning).filter(m => m !== current.word.meaning);
+            while (options.length < 4) {
+                const random = allMeanings[Math.floor(Math.random() * allMeanings.length)];
+                if (!options.includes(random)) options.push(random);
+            }
+            
+            // 打乱选项
+            const shuffled = options.sort(() => Math.random() - 0.5);
+            
+            const optionsContainer = document.getElementById('review-options');
+            optionsContainer.innerHTML = '';
+            shuffled.forEach((option, i) => {
+                const btn = document.createElement('button');
+                btn.className = 'p-4 bg-white border-2 border-gray-200 rounded-xl text-left hover:border-indigo-400 hover:bg-indigo-50 transition-all';
+                btn.innerHTML = `<span class="font-bold text-indigo-600 mr-2">${String.fromCharCode(65+i)}.</span>${option}`;
+                btn.onclick = () => checkReviewAnswer(option === current.word.meaning, current, btn);
+                optionsContainer.appendChild(btn);
+            });
+        }
+
+        // 检查复习答案
+        function checkReviewAnswer(isCorrect, current, btn) {
+            const buttons = document.getElementById('review-options').children;
+            for (let btn of buttons) {
+                btn.disabled = true;
+                btn.classList.add('opacity-50');
+            }
+            
+            const feedback = document.getElementById('review-feedback');
+            
+            if (isCorrect) {
+                btn.classList.remove('opacity-50', 'bg-white', 'border-gray-200');
+                btn.classList.add('bg-green-100', 'border-green-500');
+                feedback.innerHTML = '<span class="text-green-600">✓ 正确！记忆巩固 +1</span>';
+                feedback.className = 'p-4 rounded-xl text-center font-bold mb-4 bg-green-50';
+                
+                // 连续答对3次则标记为掌握
+                if (!current.correctCount) current.correctCount = 1;
+                else current.correctCount++;
+                
+                if (current.correctCount >= 2) {
+                    wordStatus[current.globalIdx] = 2; // 升级为已掌握
+                    reviewQueue = reviewQueue.filter(item => item.globalIdx !== current.globalIdx);
+                }
+            } else {
+                btn.classList.remove('opacity-50', 'bg-white', 'border-gray-200');
+                btn.classList.add('bg-red-100', 'border-red-500', 'shake');
+                feedback.innerHTML = `<span class="text-red-600">✗ 错误！正确答案是：${current.word.meaning}</span>`;
+                feedback.className = 'p-4 rounded-xl text-center font-bold mb-4 bg-red-50';
+                current.correctCount = 0;
+            }
+            
+            feedback.classList.remove('hidden');
+            saveProgress();
+            updateGroupDisplay();
+            updateStats();
+            
+            setTimeout(() => startReview(), 1500);
+        }
+
+        // 测试模式
+        function startTest() {
+            testResults = { correct: 0, total: 0 };
+            document.getElementById('test-current').textContent = '1';
+            nextTestQuestion();
+        }
+
+        function nextTestQuestion() {
+            if (testResults.total >= 20) {
+                showTestResults();
+                return;
+            }
+            
+            // 从当前组随机选词
+            const groupWords = getGroup(currentGroup);
+            const randomWord = groupWords[Math.floor(Math.random() * groupWords.length)];
+            
+            document.getElementById('test-question').textContent = randomWord.word;
+            document.getElementById('test-current').textContent = testResults.total + 1;
+            document.getElementById('test-feedback').classList.add('hidden');
+            
+            // 生成选项
+            const options = [randomWord.meaning];
+            while (options.length < 4) {
+                const w = allWords[Math.floor(Math.random() * allWords.length)];
+                if (!options.includes(w.meaning)) options.push(w.meaning);
+            }
+            
+            const shuffled = options.sort(() => Math.random() - 0.5);
+            const container = document.getElementById('test-options');
+            container.innerHTML = '';
+            
+            shuffled.forEach((opt, i) => {
+                const btn = document.createElement('button');
+                btn.className = 'w-full p-4 bg-white border-2 border-gray-200 rounded-xl text-left hover:border-indigo-400 transition-all';
+                btn.innerHTML = `<span class="inline-block w-8 h-8 bg-gray-100 rounded-full text-center leading-8 mr-3 text-sm font-bold text-gray-500">${String.fromCharCode(65+i)}</span>${opt}`;
+                btn.onclick = () => checkTestAnswer(opt === randomWord.meaning, btn);
+                container.appendChild(btn);
+            });
+        }
+
+        function checkTestAnswer(isCorrect, btn) {
+            testResults.total++;
+            if (isCorrect) testResults.correct++;
+            
+            const buttons = document.getElementById('test-options').children;
+            for (let b of buttons) b.disabled = true;
+            
+            if (isCorrect) {
+                btn.classList.add('bg-green-100', 'border-green-500');
+            } else {
+                btn.classList.add('bg-red-100', 'border-red-500', 'shake');
+            }
+            
+            setTimeout(() => nextTestQuestion(), 800);
+        }
+
+        function showTestResults() {
+            const accuracy = Math.round((testResults.correct / testResults.total) * 100);
+            alert(`测试完成！\n正确率：${accuracy}%\n答对：${testResults.correct}/${testResults.total}`);
+        }
+
+        // 检查组完成
+        function checkGroupCompletion() {
+            const groupWords = getGroup(currentGroup);
+            let mastered = 0;
+            groupWords.forEach((_, idx) => {
+                const globalIdx = currentGroup * WORDS_PER_GROUP + idx;
+                if (wordStatus[globalIdx] === 2) mastered++;
+            });
+            
+            const masteryRate = mastered / WORDS_PER_GROUP;
+            
+            if (masteryRate >= 0.9 && !groupProgress[currentGroup]?.completed) {
+                // 完成本组
+                groupProgress[currentGroup] = { completed: true, mastered, date: new Date().toISOString() };
+                saveProgress();
+                
+                document.getElementById('completed-group-num').textContent = currentGroup + 1;
+                document.getElementById('completion-accuracy').textContent = Math.round(masteryRate * 100) + '%';
+                document.getElementById('completion-score').textContent = mastered * 10;
+                document.getElementById('completion-modal').classList.remove('hidden');
+                
+                renderGroups();
+            }
+        }
+
+        // 下一组
+        function nextGroup() {
+            document.getElementById('completion-modal').classList.add('hidden');
+            if (currentGroup < TOTAL_GROUPS - 1) {
+                selectGroup(currentGroup + 1);
+            }
+        }
+
+        function closeCompletion() {
+            document.getElementById('completion-modal').classList.add('hidden');
+        }
+
+        // 返回分组
+        function backToGroups() {
+            document.getElementById('learning-interface').classList.add('hidden');
+            document.getElementById('group-selection').classList.remove('hidden');
+            renderGroups();
+            updateStats();
+        }
+
+        // 跳转到特定单词
+        function jumpToWord(index) {
+            const globalIdx = currentGroup * WORDS_PER_GROUP + index;
+            const word = allWords[globalIdx];
+            alert(`单词：${word.word}\n音标：${word.phonetic}\n释义：${word.meaning}\n\n例句：${word.example}`);
+        }
+
+        // 保存进度
+        function saveProgress() {
+            const data = {
+                groupProgress,
+                wordStatus,
+                currentGroup,
+                lastStudy: new Date().toISOString()
+            };
+            localStorage.setItem('wordMasterProgress', JSON.stringify(data));
+        }
+
+        // 重置进度
+        function resetProgress() {
+            if (confirm('确定要重置所有学习进度吗？此操作不可恢复！')) {
+                localStorage.removeItem('wordMasterProgress');
+                location.reload();
+            }
+        }
+
+        // 启动
+        init();
+    </script>
+</body>
+</html>
